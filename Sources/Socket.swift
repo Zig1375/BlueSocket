@@ -2740,7 +2740,7 @@ public class Socket: SocketReader, SocketWriter {
 	///
 	/// - Returns: The number of bytes returned in the buffer.
 	///
-	public func read(into data: inout Data) throws -> Int {
+	public func read(into data: inout Data, asis : Bool = false) throws -> Int {
 
 		// The socket must've been created and must be connected...
 		if self.socketfd == Socket.SOCKET_INVALID_DESCRIPTOR {
@@ -2754,7 +2754,7 @@ public class Socket: SocketReader, SocketWriter {
 		}
 
 		// Read all available bytes...
-		let count = try self.readDataIntoStorage()
+		let count = try self.readDataIntoStorage(asis : asis)
 
 		// Did we get data?
 		var returnCount: Int = 0
@@ -3499,7 +3499,7 @@ public class Socket: SocketReader, SocketWriter {
 	///
 	/// - Returns: number of bytes read.
 	///
-	private func readDataIntoStorage() throws -> Int {
+	private func readDataIntoStorage(asis : Bool = false) throws -> Int {
 
 		// Clear the buffer...
 		self.readBuffer.initialize(to: 0x0)
@@ -3601,7 +3601,7 @@ public class Socket: SocketReader, SocketWriter {
 				break
 			}
 
-		} while count > 0
+		} while ((count > 0) && (!asis));
 
 		return self.readStorage.length
 	}

@@ -2740,7 +2740,7 @@ public class Socket: SocketReader, SocketWriter {
 	///
 	/// - Returns: The number of bytes returned in the buffer.
 	///
-	public func read(into data: inout Data, asis : Bool = false) throws -> Int {
+	public func read(into data: inout Data) throws -> Int {
 
 		// The socket must've been created and must be connected...
 		if self.socketfd == Socket.SOCKET_INVALID_DESCRIPTOR {
@@ -2754,7 +2754,7 @@ public class Socket: SocketReader, SocketWriter {
 		}
 
 		// Read all available bytes...
-		let count = try self.readDataIntoStorage(asis : asis)
+		let count = try self.readDataIntoStorage()
 
 		// Did we get data?
 		var returnCount: Int = 0
@@ -3499,7 +3499,7 @@ public class Socket: SocketReader, SocketWriter {
 	///
 	/// - Returns: number of bytes read.
 	///
-	private func readDataIntoStorage(asis : Bool = false) throws -> Int {
+	private func readDataIntoStorage() throws -> Int {
 
 		// Clear the buffer...
 		self.readBuffer.initialize(to: 0x0)
@@ -3511,97 +3511,90 @@ public class Socket: SocketReader, SocketWriter {
 
 		// Read all the available data...
 		var count: Int = 0
-		repeat {
 
-			if self.delegate == nil {
+		if self.delegate == nil {
 
-				#if os(Linux)
-					count = Glibc.recv(self.socketfd, self.readBuffer, self.readBufferSize, recvFlags)
-				#else
-					count = Darwin.recv(self.socketfd, self.readBuffer, self.readBufferSize, recvFlags)
-				#endif
+			#if os(Linux)
+				count = Glibc.recv(self.socketfd, self.readBuffer, self.readBufferSize, recvFlags)
+			#else
+				count = Darwin.recv(self.socketfd, self.readBuffer, self.readBufferSize, recvFlags)
+			#endif
 
-			} else {
+		} else {
 
-				repeat {
+			repeat {
 
-					do {
+				do {
 
-						count = try self.delegate!.recv(buffer: self.readBuffer, bufSize: self.readBufferSize)
+					count = try self.delegate!.recv(buffer: self.readBuffer, bufSize: self.readBufferSize)
 
-						break
+					break
 
-					} catch let error {
+				} catch let error {
 
-						guard let err = error as? SSLError else {
+					guard let err = error as? SSLError else {
 
-							throw error
-						}
-
-						switch err {
-
-						case .success:
-							break
-
-						case .retryNeeded:
-							do {
-
-								try wait(forRead: true)
-
-							} catch let waitError {
-
-								throw waitError
-							}
-							continue
-
-						default:
-							throw Error(with: err)
-						}
-
+						throw error
 					}
 
-				} while true
+					switch err {
 
-			}
-			// Check for error...
-			if count < 0 {
+					case .success:
+						break
 
-				switch errno {
+					case .retryNeeded:
+						do {
 
-				// - Could be an error, but if errno is EAGAIN or EWOULDBLOCK (if a non-blocking socket),
-				//	it means there was NO data to read...
-				case EAGAIN:
-					fallthrough
-				case EWOULDBLOCK:
-					return self.readStorage.length
+							try wait(forRead: true)
 
-				case ECONNRESET:
-					// - Handle a connection reset by peer (ECONNRESET) and throw a different exception...
-					throw Error(code: Socket.SOCKET_ERR_CONNECTION_RESET, reason: self.lastError())
+						} catch let waitError {
 
-				default:
-					// - Something went wrong...
-					throw Error(code: Socket.SOCKET_ERR_RECV_FAILED, reason: self.lastError())
+							throw waitError
+						}
+						continue
+
+					default:
+						throw Error(with: err)
+					}
+
 				}
 
+			} while true
+
+		}
+		// Check for error...
+		if count < 0 {
+
+			switch errno {
+
+			// - Could be an error, but if errno is EAGAIN or EWOULDBLOCK (if a non-blocking socket),
+			//	it means there was NO data to read...
+			case EAGAIN:
+				fallthrough
+			case EWOULDBLOCK:
+				return self.readStorage.length
+
+			case ECONNRESET:
+				// - Handle a connection reset by peer (ECONNRESET) and throw a different exception...
+				throw Error(code: Socket.SOCKET_ERR_CONNECTION_RESET, reason: self.lastError())
+
+			default:
+				// - Something went wrong...
+				throw Error(code: Socket.SOCKET_ERR_RECV_FAILED, reason: self.lastError())
 			}
 
-			if count == 0 {
+		}
 
-				self.remoteConnectionClosed = true
-				return 0
-			}
+		if count == 0 {
 
-			// Save the data in the buffer...
-			self.readStorage.append(self.readBuffer, length: count)
+			self.remoteConnectionClosed = true
+			return 0
+		}
 
-			// Didn't fill the buffer so we've got everything available...
-			if count < self.readBufferSize {
+		// Save the data in the buffer...
+		self.readStorage.append(self.readBuffer, length: count)
 
-				break
-			}
 
-		} while ((count > 0) && (!asis));
 
 		return self.readStorage.length
 	}

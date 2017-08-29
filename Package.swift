@@ -23,7 +23,7 @@ import PackageDescription
 	
 	let package = Package(
 		name: "zSocket",
-		targets: [Target(name: "Socket")],
+		targets: [Target(name: "zSocket")],
 		exclude: ["BlueSocket.xcodeproj", "BlueSocket.xcworkspace", "README.md", "Sources/Info.plist", "Sources/Socket.h"]
 	)
 
